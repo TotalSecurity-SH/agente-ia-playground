@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { construirPrompt, extraerAccion, limpiarNegocio, LIMITES, type Mensaje } from "@/lib/negocio";
-import { ErrorLlm, proveedorConfigurado, responder } from "@/lib/llm";
+import { credencial, responder } from "@/lib/llm";
 import { respuestaDemo } from "@/lib/demo";
 
 export const maxDuration = 30;
@@ -42,11 +42,14 @@ export async function POST(request: NextRequest) {
   if (!mensajes.length || mensajes.at(-1)!.rol !== "usuario") return error(400, "Falta el mensaje del cliente.");
   if (mensajes.length > LIMITES.mensajesPorConversacion) return error(400, "La conversación llegó a su límite. Reiníciala para seguir probando.");
 
-  const proveedor = process.env.AGENTE_DEMO === "1" ? null : proveedorConfigurado();
-  try {
-    const crudo = proveedor ? await responder(proveedor, construirPrompt(negocio), mensajes) : respuestaDemo(negocio, mensajes);
-    return Response.json({ ok: true, modo: proveedor ? "ia" : "demo", ...extraerAccion(crudo, negocio.objetivo) });
-  } catch (e) {
-    return error(502, e instanceof ErrorLlm ? e.message : "No pudimos obtener respuesta. Intenta de nuevo.");
+  const ia = process.env.AGENTE_DEMO === "1" ? null : credencial(request.headers.get("x-vercel-oidc-token"));
+  if (ia) {
+    try {
+      const crudo = await responder(ia, construirPrompt(negocio), mensajes);
+      return Response.json({ ok: true, modo: "ia", ...extraerAccion(crudo, negocio.objetivo) });
+    } catch {
+      // Si la IA falla (sin crédito, saturada o caída) el agente sigue funcionando en modo demostración.
+    }
   }
+  return Response.json({ ok: true, modo: "demo", ...extraerAccion(respuestaDemo(negocio, mensajes), negocio.objetivo) });
 }

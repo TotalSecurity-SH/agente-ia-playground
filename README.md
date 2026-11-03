@@ -26,7 +26,7 @@ Configura los datos del negocio, chatea como si fueras un cliente y obtén los d
 | 📦 **Captura estructurada** | Al terminar, entrega nombre, teléfono y demás campos en JSON, listos para un CRM, Google Sheets o n8n. |
 | 🔍 **Prompt visible** | Muestra el prompt del sistema que recibe el modelo, útil para aprender a diseñar agentes. |
 | 💸 **Control de gasto** | Límite de mensajes por IP y por conversación, respuestas cortas y textos recortados en el servidor. |
-| 🧪 **Modo demostración** | Sin llave de IA, responde con reglas para que la herramienta siempre funcione. |
+| 🧪 **Siempre disponible** | Si la IA no responde o se agota el crédito, cambia solo a un modo de reglas. |
 
 ## 🏗️ Arquitectura
 
@@ -37,10 +37,10 @@ sequenceDiagram
   participant L as Proveedor de IA
   N->>A: negocio + historial
   A->>A: límite por IP · limpiarNegocio · construirPrompt
-  alt hay llave configurada
+  alt hay llave o token de Vercel
     A->>L: prompt del sistema + mensajes
     L-->>A: respuesta
-  else sin llave
+  else sin IA disponible o con error
     A->>A: respuestaDemo (reglas)
   end
   A->>A: extraerAccion (separa el JSON capturado)
@@ -56,7 +56,7 @@ src/
 │   └── Playground.tsx        configuración, chat y datos capturados
 └── lib/
     ├── negocio.ts            tipos, plantillas, prompt y extracción de la acción
-    ├── llm.ts                cliente OpenAI / Anthropic con fetch, sin SDK
+    ├── llm.ts                cliente OpenAI / Anthropic / AI Gateway con fetch, sin SDK
     └── demo.ts               agente por reglas para el modo demostración
 ```
 
@@ -75,9 +75,11 @@ Esta herramienta es una **zona** del hub [`tsh-herramientas`](https://github.com
 
 | Variable | Descripción |
 |---|---|
-| `OPENAI_API_KEY` o `ANTHROPIC_API_KEY` | Llave del proveedor. Sin llave, la herramienta corre en modo demostración. |
+| *(ninguna)* | En Vercel usa **AI Gateway** con el token OIDC del proyecto y su crédito gratuito mensual. |
+| `AI_GATEWAY_API_KEY` | Opcional: llave de AI Gateway para usarlo fuera de Vercel. |
+| `OPENAI_API_KEY` o `ANTHROPIC_API_KEY` | Opcional: llave directa del proveedor; tiene prioridad sobre AI Gateway. |
 | `LLM_PROVIDER` | Opcional: `openai` o `anthropic` si configuras ambas llaves. |
-| `LLM_MODEL` | Opcional: modelo a usar. Por defecto `gpt-4o-mini` o `claude-haiku-5-5`. |
+| `LLM_MODEL` | Opcional: modelo a usar. Por defecto `openai/gpt-4o-mini` en AI Gateway. |
 | `AGENTE_LIMITE` | Mensajes por IP cada 10 minutos. Por defecto 30. |
 | `AGENTE_DEMO` | `1` para forzar el modo demostración. |
 
